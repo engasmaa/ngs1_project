@@ -1,0 +1,11 @@
+# Download the File 
+wget -c ftp://ftp-trace.ncbi.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/SRR879/SRR8797509/SRR8797509.sra
+# Download SRA ToolKit To open downloaded file 
+wget -c https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/2.9.6/sratoolkit.2.9.6-ubuntu64.tar.gz
+# Extract it  
+tar -czxf  sratoolkit.2.9.6-ubuntu64.tar.gz
+
+
+
+
+
