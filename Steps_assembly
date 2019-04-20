@@ -1,0 +1,198 @@
+Steps :-
+
+#Sra SetUp 
+$conda install -y sra-tools
+
+#Extract First 5m Read From basic file by command (PAIRED )
+fastq-dump --split-files  -X 5000000 SRR8797509.fastq 
+
+
+
+#Download Shuffeled:
+fROM MOHAMED lINK 
+
+
+#install seqkit 
+conda install -c bioconda seqkit
+
+# Splitting 5M To 1M (two paired)
+seqkit split2 -1 SRR8797509_1.fastq -2 SRR8797509_2.fastq -p 5 -O out -f
+
+
+# Splitting 5M To 1M (two paired)  after shuffling 
+seqkit split2 -1 Sshuffled_SRR8797509_1.part_001.fastq  -2 shuffled_SRR8797509_2.part_001.fastq  -p 5 -O out -f
+
+
+
+----------------------------------
+fastaqc:
+installation
+source activate ngs1
+conda install -c bioconda fastqc 
+conda install -c bioconda multiqc 
+
+fastqc -t 1 -f fastq1_1 -noextrac
+fastqc -t 1 -f fastq1_2 -noextrac
+
+multiqc -z -o . .
+=======================================******===============================
+Trimmomic :
+source activate ngs1
+conda install -c bioconda trimmomatic  
+
+## Mild Trimming(Unshuffled ) 
+
+
+for ((i=1;i<=5;i++)) ; 
+do
+
+f1="Unshuffled/SRR8797509_1.part_00$i.fastq"
+f2="Unshuffled/SRR8797509_2.part_00$i.fastq"
+
+newf1="Unshuffled/AfterTrimming/SRR8797509_1.part_00$i.pe.trim.fq"
+newf2="Unshuffled/AfterTrimming/SRR8797509_1.part_00$i.pe.trim.fq"
+
+
+newf1U="Unshuffled/AfterTrimming/SRR8797509_1.part_00$i.se.trim.fq"
+newf2U="Unshuffled/AfterTrimming/SRR8797509_1.part_00$i.se.trim.fq"
+
+adap="/home/asmaa/miniconda3/envs/ngs1/share/trimmomatic-0.39-1/adapters"
+
+
+trimmomatic PE -threads 1 -phred33 -trimlog trimLogFile -summary statsSummaryFile \
+$f1 $f2 $newf1 $newf1U $newf2 $newf2U \
+ILLUMINACLIP:$adap/TruSeq3-PE.fa:2:30:10:1 SLIDINGWINDOW:4:15 MINLEN:36
+
+
+done 
+ 
+===============================================
+#Aggressive Trimming for SX_2. {shuffled}
+
+for ((i=1;i<=5;i++)) ;
+do
+
+Dir_Before="/home/asmaa/NGS1_Course/Assignment/5M_after_shuffle/shuffled_srr8797509/out/"
+Dir_After="/home/asmaa/NGS1_Course/Assignment/Trimming/Shuffled/AfterTrimming/"
+
+f1=$Dir_Before"shuffled_SRR8797509_1.part_001.part_00$i.fastq"
+f2=$Dir_Before"shuffled_SRR8797509_2.part_001.part_00$i.fastq"
+
+newf1=$Dir_After"shuffled_SRR8797509_1.part_00$i.pe.trim.fq"
+newf2=$Dir_After"shuffled_SRR8797509_2.part_00$i.pe.trim.fq"
+
+newf1U=$Dir_After"shuffled_SRR8797509_1.part_00$i.se.trim.fq"
+newf2U=$Dir_After"shuffled_SRR8797509_2.part_00$i.se.trim.fq"
+
+adap="/home/asmaa/miniconda3/envs/ngs1/share/trimmomatic-0.39-1/adapters"
+
+trimmomatic PE -threads 1 -phred33 -trimlog trimLogFile -summary statsSummaryFile \
+$f1 $f2 $newf1 $newf1U $newf2 $newf2U \
+ILLUMINACLIP:$adap/TruSeq3-PE.fa:2:30:10:1 SLIDINGWINDOW:4:30 MINLEN:36
+
+done
+=======================================******===============================
+
+##Alignment 
+##BWA Alignment ( unshuffled - slice then refrence to exons )
+
+
+source activate ngs1
+conda install -c bioconda bwa 
+#1--index#
+bwa index -a bwtsw  gencode.v29.pc_transcripts.chr22.simplified.fa 
+
+
+for ((i=1;i<=5;i++)) ;
+do
+
+Dir_Before="/home/asmaa/NGS1_Course/Assignment/Trimming/Shuffled/AfterTrimming/"
+
+
+#2--alignment#
+R1=$Dir_Before"shuffled_SRR8797509_1.part_00$i.pe.trim.fq"
+R2=$Dir_After"shuffled_SRR8797509_2.part_00$i.pe.trim.fq"
+/usr/bin/time -v bwa mem bwaIndex/gencode.v29.pc_transcripts.chr22.simplified.fa   $R1 $R2 > shuffled_SRR8797509$i.sam
+
+done 
+
+
+
+##HISAT for SX_2 (unshufled - cannot slice )
+
+#hisat2_extract_splice_sites.py   gencode.v29.annotation.gtf  > splicesites.tsv
+#hisat2_extract_exons.py   gencode.v29.annotation.gtf  > exons.tsv
+#hisat2-build -p 1 --ss splicesites.tsv --exon exons.tsv chr22_with_ERCC92.fa chr22_with_ERCC92
+
+
+
+
+
+
+
+for ((i=1;i<=5;i++)) ;
+do
+
+Dir_Before="/home/asmaa/NGS1_Course/Assignment/Trimming/Shuffled/AfterTrimming/"
+
+R1=$Dir_Before"shuffled_SRR8797509_1.part_00$i.pe.trim.fq"
+R2=$Dir_Before"shuffled_SRR8797509_2.part_00$i.pe.trim.fq"
+
+hisat2 -p 1 -x hisatIndex/chr22_with_ERCC92 --dta --rna-strandness RF -1 $R1 -2 $R2 -S UHR_Rep$i.sam
+
+done
+
+
+
+=======================================******===============================
+
+#Assembly : 
+#Convert Sam To Bam 
+#hisat 
+for ((i=1;i<=5;i++)) ;
+do
+
+
+# convert the SAM file into BAM file 
+samtools view -bS /home/asmaa/NGS1_Course/Assignment/Alignment/hisat/shuffled_SRR8797509$i.sam > hisat_bam/shuffled_SRR8797509$i.bam
+#convert the BAM file to a sorted BAM file. 
+samtools sort hisat_bam/shuffled_SRR8797509$i.bam -o hisat_bam/shuffled_SRR8797509$i.sorted.bam  
+
+done 
+
+
+######################################
+#BWA 
+
+
+for ((i=1;i<=5;i++)) ;
+do
+
+
+# convert the SAM file into BAM file 
+samtools view -bS /home/asmaa/NGS1_Course/Assignment/Alignment/unshuffled_SRR8797509$i.sam > bwa_bam/unshuffled_SRR87975091$i.bam
+#convert the BAM file to a sorted BAM file. 
+samtools sort bwa_bam/unshuffled_SRR87975091$i.bam -o bwa_bam/unshuffled_SRR87975091$i.sorted.bam 
+
+done 
+
+
+=============================******===============================
+##unshuffled -- bwa  -- 
+
+
+for ((i=1;i<=5;i++)) ;
+do
+stringtie bwa_bam/unshuffled_SRR879750911.sorted.bam --rf -l  Assemby_unshuffled/stringTie_unshuffled$i  -o  Assemby_unshuffled/stringTie_unshuffled$i.gtf
+
+## how many transcript do you have?
+cat shuffled/stringTie_unshuffled$i.gtf | grep -v "^@" | awk '$3=="transcript"' | wc -l
+
+
+done
+
+
+
+
+ 
+
